@@ -2,6 +2,48 @@
 
 A simple example showing how to use the [gobed](https://github.com/lee101/gobed) embedding library.
 
+## 🎯 Interactive Similarity Calculator
+
+We've included an interactive CLI tool to test text similarity:
+
+```bash
+# Run the similarity calculator
+./run_similarity.sh
+
+# Or directly:
+go run similarity.go
+```
+
+### How to use:
+1. Run the tool
+2. Enter your first text when prompted
+3. Enter your second text
+4. See the similarity score, distance, and interpretation
+5. Type 'quit' to exit
+
+### Example session:
+```
+🚀 Gobed Similarity Calculator
+================================
+
+Loading model... ✓
+
+Enter first text (or 'quit' to exit): Machine learning is fascinating.
+Enter second text: Deep learning models are powerful.
+
+📊 Calculating...
+
+============================================================
+📝 Text 1: "Machine learning is fascinating."
+📝 Text 2: "Deep learning models are powerful."
+------------------------------------------------------------
+✨ Cosine Similarity: 0.3333
+   → Moderately similar ✓
+📏 Distance: 0.6667 (1 - similarity)
+📊 Similarity percentage: 33.3%
+============================================================
+```
+
 ## Setup
 
 ```bash

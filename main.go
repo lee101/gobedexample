@@ -3,14 +3,41 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/lee101/gobed"
 )
 
+// Calculate Euclidean distance between two embeddings
+func euclideanDistance(a, b []float32) float32 {
+	if len(a) != len(b) {
+		return 0
+	}
+	var sum float32
+	for i := range a {
+		diff := a[i] - b[i]
+		sum += diff * diff
+	}
+	return float32(math.Sqrt(float64(sum)))
+}
+
+// Calculate Manhattan distance between two embeddings
+func manhattanDistance(a, b []float32) float32 {
+	if len(a) != len(b) {
+		return 0
+	}
+	var sum float32
+	for i := range a {
+		sum += float32(math.Abs(float64(a[i] - b[i])))
+	}
+	return sum
+}
+
 func main() {
-	fmt.Println("🚀 Gobed Example")
-	fmt.Println("================")
+	fmt.Println("🚀 Gobed Distance Metrics Example")
+	fmt.Println("==================================")
 	
 	// Load the embedding model
 	fmt.Print("Loading model... ")
@@ -21,65 +48,231 @@ func main() {
 	}
 	fmt.Printf("✓ (%.2fs)\n\n", time.Since(start).Seconds())
 
-	// Example texts
-	texts := []string{
-		"Machine learning is fascinating.",
-		"Deep learning models are powerful.",
-		"The weather is nice today.",
-		"Python is a programming language.",
-		"Natural language processing",
+	// Define test texts - grouped by similarity
+	relatedTexts := []struct {
+		category string
+		texts    []string
+	}{
+		{
+			category: "🤖 Machine Learning",
+			texts: []string{
+				"Machine learning is fascinating.",
+				"Deep learning models are powerful.",
+				"Neural networks process information.",
+				"Artificial intelligence will change the world.",
+			},
+		},
+		{
+			category: "💻 Programming",
+			texts: []string{
+				"Python is a programming language.",
+				"JavaScript runs in browsers.",
+				"Code should be readable.",
+			},
+		},
+		{
+			category: "🌤️ Daily Life",
+			texts: []string{
+				"The weather is nice today.",
+				"Good morning everyone",
+				"Pizza tastes delicious.",
+			},
+		},
+		{
+			category: "🌳 Nature",
+			texts: []string{
+				"Trees grow tall in the forest.",
+				"Birds are singing beautifully.",
+			},
+		},
 	}
 
-	// 1. Encode texts
-	fmt.Println("📝 Encoding texts:")
-	embeddings := make([][]float32, len(texts))
-	for i, text := range texts {
-		emb, err := model.Encode(text)
-		if err != nil {
-			fmt.Printf("   ❌ %s: %v\n", text, err)
+	// Encode all texts
+	fmt.Println("📝 Encoding texts and calculating distances...")
+	fmt.Println()
+	
+	type textEmbedding struct {
+		text     string
+		category string
+		embedding []float32
+	}
+	
+	var allTexts []textEmbedding
+	for _, group := range relatedTexts {
+		for _, text := range group.texts {
+			emb, err := model.Encode(text)
+			if err != nil {
+				fmt.Printf("Warning: couldn't encode '%s': %v\n", text, err)
+				continue
+			}
+			allTexts = append(allTexts, textEmbedding{
+				text:     text,
+				category: group.category,
+				embedding: emb,
+			})
+		}
+	}
+
+	// 1. Show distances within same category (should be smaller)
+	fmt.Println("📊 DISTANCES WITHIN SAME CATEGORY (Related Texts)")
+	fmt.Println(strings.Repeat("=", 51))
+	
+	for _, group := range relatedTexts {
+		if len(group.texts) < 2 {
 			continue
 		}
-		embeddings[i] = emb
-		fmt.Printf("   ✓ %s → [%.2f, %.2f, ...]\n", text, emb[0], emb[1])
-	}
-	fmt.Println()
-
-	// 2. Calculate similarities
-	fmt.Println("🎯 Similarity scores:")
-	text1, text2 := texts[0], texts[1]
-	similarity, err := model.Similarity(text1, text2)
-	if err == nil {
-		fmt.Printf("   '%s'\n   '%s'\n   → Similarity: %.4f\n", text1, text2, similarity)
-	}
-	fmt.Println()
-
-	// 3. Find most similar
-	fmt.Println("🔍 Most similar to '" + texts[0] + "':")
-	results, err := model.FindMostSimilar(texts[0], texts[1:], 3)
-	if err == nil {
-		for i, r := range results {
-			fmt.Printf("   %d. %s (%.4f)\n", i+1, r.Text2, r.Similarity)
+		
+		fmt.Printf("\n%s %s:\n", group.category, group.category[:4])
+		
+		// Get embeddings for this category
+		var categoryEmbs []textEmbedding
+		for _, te := range allTexts {
+			if te.category == group.category {
+				categoryEmbs = append(categoryEmbs, te)
+			}
+		}
+		
+		// Calculate pairwise distances within category
+		for i := 0; i < len(categoryEmbs)-1; i++ {
+			for j := i + 1; j < len(categoryEmbs); j++ {
+				sim, _ := model.Similarity(categoryEmbs[i].text, categoryEmbs[j].text)
+				eucDist := euclideanDistance(categoryEmbs[i].embedding, categoryEmbs[j].embedding)
+				manDist := manhattanDistance(categoryEmbs[i].embedding, categoryEmbs[j].embedding)
+				
+				fmt.Printf("  '%s'\n  '%s'\n", 
+					categoryEmbs[i].text, categoryEmbs[j].text)
+				fmt.Printf("    → Cosine Similarity: %.4f (↑ higher = more similar)\n", sim)
+				fmt.Printf("    → Euclidean Distance: %.2f (↓ lower = more similar)\n", eucDist)
+				fmt.Printf("    → Manhattan Distance: %.2f (↓ lower = more similar)\n", manDist)
+				fmt.Println()
+			}
 		}
 	}
-	fmt.Println()
 
-	// 4. Performance benchmark
-	fmt.Println("⚡ Performance:")
-	iterations := 10000
-	testText := texts[0]
+	// 2. Show distances between different categories (should be larger)
+	fmt.Println("📊 DISTANCES BETWEEN DIFFERENT CATEGORIES (Unrelated Texts)")
+	fmt.Println(strings.Repeat("=", 59))
 	
-	start = time.Now()
-	for i := 0; i < iterations; i++ {
-		_, _ = model.Encode(testText)
+	// Compare texts from different categories
+	comparisons := []struct {
+		text1 string
+		cat1  string
+		text2 string
+		cat2  string
+	}{
+		{
+			"Machine learning is fascinating.",
+			"🤖 ML",
+			"Pizza tastes delicious.",
+			"🍕 Food",
+		},
+		{
+			"Neural networks process information.",
+			"🤖 ML",
+			"The weather is nice today.",
+			"🌤️ Daily",
+		},
+		{
+			"Python is a programming language.",
+			"💻 Code",
+			"Birds are singing beautifully.",
+			"🌳 Nature",
+		},
+		{
+			"Deep learning models are powerful.",
+			"🤖 ML",
+			"Good morning everyone",
+			"👋 Greeting",
+		},
 	}
-	elapsed := time.Since(start)
 	
-	avgLatency := elapsed / time.Duration(iterations)
-	throughput := float64(iterations) / elapsed.Seconds()
-	
-	fmt.Printf("   • Latency: %v per encoding\n", avgLatency)
-	fmt.Printf("   • Throughput: %.0f encodings/sec\n", throughput)
 	fmt.Println()
+	for _, comp := range comparisons {
+		// Find embeddings
+		var emb1, emb2 []float32
+		for _, te := range allTexts {
+			if te.text == comp.text1 {
+				emb1 = te.embedding
+			}
+			if te.text == comp.text2 {
+				emb2 = te.embedding
+			}
+		}
+		
+		if len(emb1) > 0 && len(emb2) > 0 {
+			sim, _ := model.Similarity(comp.text1, comp.text2)
+			eucDist := euclideanDistance(emb1, emb2)
+			manDist := manhattanDistance(emb1, emb2)
+			
+			fmt.Printf("%s '%s'\n%s '%s'\n", 
+				comp.cat1, comp.text1, comp.cat2, comp.text2)
+			fmt.Printf("    → Cosine Similarity: %.4f (↑ higher = more similar)\n", sim)
+			fmt.Printf("    → Euclidean Distance: %.2f (↓ lower = more similar)\n", eucDist)
+			fmt.Printf("    → Manhattan Distance: %.2f (↓ lower = more similar)\n", manDist)
+			fmt.Println()
+		}
+	}
+
+	// 3. Summary statistics
+	fmt.Println("📈 SUMMARY STATISTICS")
+	fmt.Println(strings.Repeat("=", 21))
 	
-	fmt.Println("✅ Done!")
+	var relatedSims, unrelatedSims []float32
+	var relatedEucDists, unrelatedEucDists []float32
+	
+	// Calculate all pairwise metrics
+	for i := 0; i < len(allTexts); i++ {
+		for j := i + 1; j < len(allTexts); j++ {
+			sim, _ := model.Similarity(allTexts[i].text, allTexts[j].text)
+			eucDist := euclideanDistance(allTexts[i].embedding, allTexts[j].embedding)
+			
+			if allTexts[i].category == allTexts[j].category {
+				relatedSims = append(relatedSims, sim)
+				relatedEucDists = append(relatedEucDists, eucDist)
+			} else {
+				unrelatedSims = append(unrelatedSims, sim)
+				unrelatedEucDists = append(unrelatedEucDists, eucDist)
+			}
+		}
+	}
+	
+	// Calculate averages
+	avgRelSim := average(relatedSims)
+	avgUnrelSim := average(unrelatedSims)
+	avgRelEuc := average(relatedEucDists)
+	avgUnrelEuc := average(unrelatedEucDists)
+	
+	fmt.Printf("\n📊 Average Cosine Similarity:\n")
+	fmt.Printf("   Related texts:   %.4f (higher is better)\n", avgRelSim)
+	fmt.Printf("   Unrelated texts: %.4f\n", avgUnrelSim)
+	fmt.Printf("   Difference:      %.4f (larger gap is better)\n", avgRelSim - avgUnrelSim)
+	
+	fmt.Printf("\n📏 Average Euclidean Distance:\n")
+	fmt.Printf("   Related texts:   %.2f (lower is better)\n", avgRelEuc)
+	fmt.Printf("   Unrelated texts: %.2f\n", avgUnrelEuc)
+	fmt.Printf("   Difference:      %.2f (larger gap is better)\n", avgUnrelEuc - avgRelEuc)
+	
+	// Show that the model can distinguish
+	fmt.Println("\n✅ Model Quality Check:")
+	if avgRelSim > avgUnrelSim && avgRelEuc < avgUnrelEuc {
+		fmt.Println("   ✓ Model correctly identifies related texts as more similar")
+		fmt.Println("   ✓ Related texts have higher similarity and lower distance")
+		fmt.Printf("   ✓ Discrimination ratio: %.2fx better similarity for related texts\n", 
+			avgRelSim/avgUnrelSim)
+	} else {
+		fmt.Println("   ⚠️ Unexpected results - check model or texts")
+	}
+	
+	fmt.Println("\n🎉 Done!")
+}
+
+func average(values []float32) float32 {
+	if len(values) == 0 {
+		return 0
+	}
+	var sum float32
+	for _, v := range values {
+		sum += v
+	}
+	return sum / float32(len(values))
 }
