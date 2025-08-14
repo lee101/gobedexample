@@ -1,80 +1,59 @@
 # Gobed Example
 
-This example demonstrates how to use the [gobed](https://github.com/lee101/gobed) embedding model library.
-
-## Prerequisites
-
-- Go 1.21 or later
-- The gobed model files (see setup below)
+A simple example showing how to use the [gobed](https://github.com/lee101/gobed) embedding library.
 
 ## Setup
 
-### Option 1: Clone and Run
-
 ```bash
-# Clone this example repository
-git clone <your-repo-url> gobedexample
+# Clone this example
+git clone <your-repo> gobedexample
 cd gobedexample
 
-# The go.mod already includes the gobed dependency from GitHub
-# It will be automatically downloaded when you run the example
-
-# Create symlink to model files (if you have gobed cloned locally)
-ln -s /path/to/gobed/model model
-
-# Or download the model files using the gobed setup script
-git clone https://github.com/lee101/gobed.git ../gobed
+# Download model files (one-time setup)
+git clone https://github.com/lee101/gobed ../gobed
 cd ../gobed && ./setup.sh && cd ../gobedexample
 ln -s ../gobed/model model
-```
 
-### Option 2: Use in Your Own Project
-
-```bash
-# In your Go project, get the gobed library
-go get github.com/lee101/gobed@latest
-
-# You'll need to have the model files available
-# Download them using the gobed setup script or copy from an existing installation
-```
-
-## Running the Example
-
-```bash
+# Run the example
 go run main.go
 ```
 
-## What This Example Shows
+## What it does
 
-- **Loading the Model**: How to load the pre-trained embedding model
-- **Text Encoding**: Converting text to high-dimensional embeddings
-- **Similarity Calculation**: Computing semantic similarity between texts
-- **Finding Similar Texts**: Searching for the most similar texts to a query
-- **Performance Benchmarking**: Measuring encoding speed and throughput
+1. **Loads the model** - ~250ms startup time
+2. **Encodes text** - Converts text to 1024-dimensional vectors
+3. **Calculates similarity** - Measures semantic similarity between texts
+4. **Finds similar texts** - Searches for most similar texts
+5. **Benchmarks performance** - Shows ~150,000+ encodings/second
 
-## Expected Output
+## Using in your own project
 
-The example will:
-1. Load the static-retrieval-mrl-en-v1 model (119MB)
-2. Show available pre-tokenized texts
-3. Encode sample texts and display their embeddings
-4. Calculate similarity scores between text pairs
-5. Find the most similar texts to a query
-6. Run a performance benchmark showing ~150,000+ encodings/second
+```bash
+go get github.com/lee101/gobed
+```
 
-## Model Requirements
+Then copy the model files to your project or set up a symlink as shown above.
 
-The gobed library requires:
-- The safetensors model file (~119MB)
-- Pre-computed tokenization data
-- Go 1.21 or later
+## Example output
 
-## Performance
+```
+🚀 Gobed Example
+================
+Loading model... ✓ (0.25s)
 
-On a typical CPU, you can expect:
-- **Model loading**: ~250-500ms
-- **Single encoding**: ~6-15μs
-- **Throughput**: 70,000-150,000 encodings/second
-- **Memory usage**: ~120MB
+📝 Encoding texts:
+   ✓ Machine learning is fascinating. → [2.74, 13.40, ...]
+   ✓ Deep learning models are powerful. → [0.49, 7.40, ...]
+   ...
 
-This is approximately 71x faster than Python GPU inference!
+🎯 Similarity scores:
+   'Machine learning is fascinating.'
+   'Deep learning models are powerful.'
+   → Similarity: 0.3333
+
+⚡ Performance:
+   • Latency: 6µs per encoding
+   • Throughput: 166667 encodings/sec
+
+✅ Done!
+```
