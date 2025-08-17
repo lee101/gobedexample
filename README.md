@@ -1,6 +1,199 @@
 # Gobed Example
 
-A simple example showing how to use the [gobed](https://github.com/lee101/gobed) embedding library.
+A simple example showing how to use the [gobed](https://github.com/lee101/gobed) embedding library for text embeddings and similarity calculations.
+
+## 🤖 Model
+
+Gobed uses **[sentence-transformers/static-retrieval-mrl-en-v1](https://huggingface.co/sentence-transformers/static-retrieval-mrl-en-v1)**, a high-performance static embedding model that:
+
+- Generates 1024-dimensional embeddings
+- Optimized for retrieval and similarity tasks
+- Supports English text
+- Runs efficiently on CPU (no GPU required)
+- Provides excellent semantic understanding for text similarity
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+go get github.com/lee101/gobed
+```
+
+### Basic Usage
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "github.com/lee101/gobed"
+)
+
+func main() {
+    // Load the embedding model
+    model, err := gobed.LoadModel()
+    if err != nil {
+        log.Fatal("Failed to load model:", err)
+    }
+    defer model.Close()
+    
+    // Calculate similarity between two texts
+    text1 := "Machine learning is fascinating"
+    text2 := "Deep learning is powerful"
+    
+    similarity := model.Similarity(text1, text2)
+    fmt.Printf("Similarity: %.4f\n", similarity)
+}
+```
+
+## 📚 Core API
+
+### LoadModel()
+Loads the embedding model from disk. The model must be available in a `model/` directory.
+
+```go
+model, err := gobed.LoadModel()
+if err != nil {
+    log.Fatal(err)
+}
+defer model.Close()  // Always close when done
+```
+
+### Embed()
+Converts text into a 1024-dimensional embedding vector.
+
+```go
+// Single text embedding
+embedding := model.Embed("Your text here")
+// Returns []float32 with 1024 dimensions
+
+// Batch embedding for multiple texts
+texts := []string{"Text one", "Text two", "Text three"}
+embeddings := model.EmbedBatch(texts)
+// Returns [][]float32
+```
+
+### Similarity()
+Calculates cosine similarity between two texts (0 to 1, where 1 = identical).
+
+```go
+similarity := model.Similarity("Text A", "Text B")
+// Returns float32 between 0 and 1
+
+// Interpretation:
+// > 0.9  = Very similar
+// 0.7-0.9 = Similar  
+// 0.4-0.7 = Moderately similar
+// < 0.4  = Different
+```
+
+## 💡 Common Use Cases
+
+### Semantic Search
+Find the most similar documents to a query:
+
+```go
+// Your document database
+documents := []string{
+    "The quick brown fox jumps over the lazy dog",
+    "Machine learning transforms data into insights",
+    "Natural language processing enables computers to understand text",
+    "The weather today is sunny and warm",
+}
+
+query := "AI and text understanding"
+
+// Embed query
+queryEmbed := model.Embed(query)
+
+// Find most similar document
+bestIdx := -1
+bestScore := float32(0)
+
+for i, doc := range documents {
+    docEmbed := model.Embed(doc)
+    score := gobed.CosineSimilarity(queryEmbed, docEmbed)
+    if score > bestScore {
+        bestScore = score
+        bestIdx = i
+    }
+}
+
+fmt.Printf("Most similar: %s (score: %.3f)\n", documents[bestIdx], bestScore)
+```
+
+### Duplicate Detection
+Identify near-duplicate content:
+
+```go
+threshold := float32(0.85)  // 85% similarity threshold
+
+texts := []string{
+    "The car is red",
+    "The automobile is red", 
+    "The vehicle is crimson",
+    "The sky is blue",
+}
+
+for i := 0; i < len(texts); i++ {
+    for j := i + 1; j < len(texts); j++ {
+        sim := model.Similarity(texts[i], texts[j])
+        if sim > threshold {
+            fmt.Printf("Potential duplicates (%.1f%% similar):\n", sim*100)
+            fmt.Printf("  - %s\n  - %s\n", texts[i], texts[j])
+        }
+    }
+}
+```
+
+### Clustering Similar Texts
+Group texts by semantic similarity:
+
+```go
+texts := []string{
+    "Python is a programming language",
+    "Java is used for software development",
+    "Dogs are loyal pets",
+    "Cats are independent animals",
+    "JavaScript runs in browsers",
+}
+
+// Simple clustering by similarity
+groups := make(map[int][]string)
+assigned := make([]bool, len(texts))
+groupId := 0
+
+for i, text := range texts {
+    if assigned[i] {
+        continue
+    }
+    
+    // Start new group
+    groups[groupId] = []string{text}
+    assigned[i] = true
+    
+    // Find similar texts
+    for j := i + 1; j < len(texts); j++ {
+        if !assigned[j] {
+            if model.Similarity(text, texts[j]) > 0.6 {
+                groups[groupId] = append(groups[groupId], texts[j])
+                assigned[j] = true
+            }
+        }
+    }
+    groupId++
+}
+
+// Print groups
+for id, group := range groups {
+    fmt.Printf("Group %d:\n", id)
+    for _, text := range group {
+        fmt.Printf("  - %s\n", text)
+    }
+}
+```
 
 ## 🎯 Interactive Similarity Calculator
 
@@ -44,37 +237,34 @@ Enter second text: Deep learning models are powerful.
 ============================================================
 ```
 
-## Setup
+## 🔧 Model Setup
 
+The gobed library requires model files to be available. There are two ways to set this up:
+
+### Option 1: Download model files directly
 ```bash
-# Clone this example
-git clone <your-repo> gobedexample
-cd gobedexample
-
-# Download model files (one-time setup)
-git clone https://github.com/lee101/gobed ../gobed
-cd ../gobed && ./setup.sh && cd ../gobedexample
-ln -s ../gobed/model model
-
-# Run the example
-go run main.go
+# Clone gobed repo and run setup
+git clone https://github.com/lee101/gobed
+cd gobed && ./setup.sh
+# This downloads the model files to gobed/model/
 ```
 
-## What it does
-
-1. **Loads the model** - ~250ms startup time
-2. **Encodes text** - Converts text to 1024-dimensional vectors
-3. **Calculates similarity** - Measures semantic similarity between texts
-4. **Finds similar texts** - Searches for most similar texts
-5. **Benchmarks performance** - Shows ~150,000+ encodings/second
-
-## Using in your own project
-
+### Option 2: Link to existing model files
 ```bash
-go get github.com/lee101/gobed
+# If you already have the model files elsewhere
+ln -s /path/to/model ./model
 ```
 
-Then copy the model files to your project or set up a symlink as shown above.
+The model directory should contain:
+- `model.onnx` - The ONNX model file
+- `tokenizer.json` - The tokenizer configuration
+
+## ⚡ Performance
+
+- **Load time**: ~250ms model initialization
+- **Encoding speed**: ~150,000+ texts/second
+- **Memory usage**: ~500MB for model
+- **Vector dimensions**: 1024 (float32)
 
 ## Example output
 
