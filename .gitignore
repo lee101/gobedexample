@@ -1,15 +1,15 @@
-# Model data (do not commit)
+# Large model files
 model/
 *.safetensors
 
 # Build artifacts
-similarity
+*.exe
 *.out
 *.test
 
-# Go build cache
-*.exe
+# Go backup files
+*.go.bak
 
-# Python caches
+# Python cache
 __pycache__/
 *.pyc
