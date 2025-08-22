@@ -1,26 +1,21 @@
 # Gobed Example
 
-A simple example showing how to use the [gobed](https://github.com/lee101/gobed) embedding library for text embeddings and similarity calculations.
+Simple example showing how to use [gobed](https://github.com/lee101/gobed) for text embeddings and similarity search.
 
-## 🤖 Model
-
-Gobed uses **[sentence-transformers/static-retrieval-mrl-en-v1](https://huggingface.co/sentence-transformers/static-retrieval-mrl-en-v1)**, a high-performance static embedding model that:
-
-- Generates 1024-dimensional embeddings
-- Optimized for retrieval and similarity tasks
-- Supports English text
-- Runs efficiently on CPU (no GPU required)
-- Provides excellent semantic understanding for text similarity
-
-## 🚀 Quick Start
-
-### Installation
+## Quick Start
 
 ```bash
-go get github.com/lee101/gobed
+# Install dependencies
+go mod tidy
+
+# Run basic example
+go run main.go
+
+# Interactive similarity calculator
+go run similarity.go
 ```
 
-### Basic Usage
+## Basic Usage
 
 ```go
 package main
@@ -32,260 +27,144 @@ import (
 )
 
 func main() {
-    // Load the embedding model
+    // Load model
     model, err := gobed.LoadModel()
     if err != nil {
-        log.Fatal("Failed to load model:", err)
+        log.Fatal(err)
     }
     defer model.Close()
     
-    // Calculate similarity between two texts
-    text1 := "Machine learning is fascinating"
-    text2 := "Deep learning is powerful"
+    // Calculate similarity
+    similarity := model.Similarity(
+        "Machine learning is fascinating",
+        "Deep learning is powerful",
+    )
     
-    similarity := model.Similarity(text1, text2)
-    fmt.Printf("Similarity: %.4f\n", similarity)
+    fmt.Printf("Similarity: %.3f\n", similarity)
+    // Output: Similarity: 0.333
 }
 ```
 
-## 📚 Core API
+## What This Example Shows
 
-### LoadModel()
-Loads the embedding model from disk. The model must be available in a `model/` directory.
+- **Text similarity**: Compare how similar two pieces of text are (0-1 scale)
+- **Batch embedding**: Process multiple texts efficiently  
+- **Distance metrics**: Cosine, Euclidean, and Manhattan distances
+- **Interactive CLI**: Test similarity calculations in real-time
 
+## Model Details
+
+Uses **sentence-transformers/static-retrieval-mrl-en-v1**:
+- 1024-dimensional embeddings
+- Optimized for retrieval tasks
+- CPU-only (no GPU required)
+- ~150K texts/second encoding speed
+
+## Common Use Cases
+
+**Find similar documents:**
 ```go
-model, err := gobed.LoadModel()
-if err != nil {
-    log.Fatal(err)
-}
-defer model.Close()  // Always close when done
-```
-
-### Embed()
-Converts text into a 1024-dimensional embedding vector.
-
-```go
-// Single text embedding
-embedding := model.Embed("Your text here")
-// Returns []float32 with 1024 dimensions
-
-// Batch embedding for multiple texts
-texts := []string{"Text one", "Text two", "Text three"}
-embeddings := model.EmbedBatch(texts)
-// Returns [][]float32
-```
-
-### Similarity()
-Calculates cosine similarity between two texts (0 to 1, where 1 = identical).
-
-```go
-similarity := model.Similarity("Text A", "Text B")
-// Returns float32 between 0 and 1
-
-// Interpretation:
-// > 0.9  = Very similar
-// 0.7-0.9 = Similar  
-// 0.4-0.7 = Moderately similar
-// < 0.4  = Different
-```
-
-## 💡 Common Use Cases
-
-### Semantic Search
-Find the most similar documents to a query:
-
-```go
-// Your document database
-documents := []string{
-    "The quick brown fox jumps over the lazy dog",
-    "Machine learning transforms data into insights",
-    "Natural language processing enables computers to understand text",
-    "The weather today is sunny and warm",
-}
-
-query := "AI and text understanding"
-
-// Embed query
-queryEmbed := model.Embed(query)
-
-// Find most similar document
-bestIdx := -1
+query := "machine learning"
+bestMatch := ""
 bestScore := float32(0)
 
-for i, doc := range documents {
-    docEmbed := model.Embed(doc)
-    score := gobed.CosineSimilarity(queryEmbed, docEmbed)
+for _, doc := range documents {
+    score := model.Similarity(query, doc)
     if score > bestScore {
         bestScore = score
-        bestIdx = i
+        bestMatch = doc
     }
 }
-
-fmt.Printf("Most similar: %s (score: %.3f)\n", documents[bestIdx], bestScore)
 ```
 
-### Duplicate Detection
-Identify near-duplicate content:
-
+**Detect duplicates:**
 ```go
-threshold := float32(0.85)  // 85% similarity threshold
-
-texts := []string{
-    "The car is red",
-    "The automobile is red", 
-    "The vehicle is crimson",
-    "The sky is blue",
-}
-
+threshold := float32(0.85)
 for i := 0; i < len(texts); i++ {
     for j := i + 1; j < len(texts); j++ {
-        sim := model.Similarity(texts[i], texts[j])
-        if sim > threshold {
-            fmt.Printf("Potential duplicates (%.1f%% similar):\n", sim*100)
-            fmt.Printf("  - %s\n  - %s\n", texts[i], texts[j])
+        if model.Similarity(texts[i], texts[j]) > threshold {
+            fmt.Printf("Potential duplicate: %s vs %s\n", texts[i], texts[j])
         }
     }
 }
 ```
 
-### Clustering Similar Texts
-Group texts by semantic similarity:
-
+**Group similar content:**
 ```go
-texts := []string{
-    "Python is a programming language",
-    "Java is used for software development",
-    "Dogs are loyal pets",
-    "Cats are independent animals",
-    "JavaScript runs in browsers",
-}
+// Embed all texts once
+embeddings := model.EmbedBatch(texts)
 
-// Simple clustering by similarity
-groups := make(map[int][]string)
-assigned := make([]bool, len(texts))
-groupId := 0
-
-for i, text := range texts {
-    if assigned[i] {
-        continue
-    }
-    
-    // Start new group
-    groups[groupId] = []string{text}
-    assigned[i] = true
-    
-    // Find similar texts
-    for j := i + 1; j < len(texts); j++ {
-        if !assigned[j] {
-            if model.Similarity(text, texts[j]) > 0.6 {
-                groups[groupId] = append(groups[groupId], texts[j])
-                assigned[j] = true
-            }
+// Find clusters using similarity threshold
+for i, emb1 := range embeddings {
+    for j, emb2 := range embeddings[i+1:] {
+        sim := gobed.CosineSimilarity(emb1, emb2)
+        if sim > 0.7 {
+            fmt.Printf("Similar: %s <-> %s (%.3f)\n", 
+                texts[i], texts[i+j+1], sim)
         }
-    }
-    groupId++
-}
-
-// Print groups
-for id, group := range groups {
-    fmt.Printf("Group %d:\n", id)
-    for _, text := range group {
-        fmt.Printf("  - %s\n", text)
     }
 }
 ```
 
-## 🎯 Interactive Similarity Calculator
+## Interactive Tool
 
-We've included an interactive CLI tool to test text similarity:
+Test similarity between any two texts:
 
 ```bash
-# Run the similarity calculator
 ./run_similarity.sh
-
-# Or directly:
+# or
 go run similarity.go
 ```
 
-### How to use:
-1. Run the tool
-2. Enter your first text when prompted
-3. Enter your second text
-4. See the similarity score, distance, and interpretation
-5. Type 'quit' to exit
-
-### Example session:
+Example session:
 ```
 🚀 Gobed Similarity Calculator
-================================
+Enter first text: The weather is nice today
+Enter second text: It's a beautiful sunny day
 
-Loading model... ✓
-
-Enter first text (or 'quit' to exit): Machine learning is fascinating.
-Enter second text: Deep learning models are powerful.
-
-📊 Calculating...
-
-============================================================
-📝 Text 1: "Machine learning is fascinating."
-📝 Text 2: "Deep learning models are powerful."
-------------------------------------------------------------
-✨ Cosine Similarity: 0.3333
-   → Moderately similar ✓
-📏 Distance: 0.6667 (1 - similarity)
-📊 Similarity percentage: 33.3%
-============================================================
+✨ Similarity: 0.745 (highly similar)
+📏 Distance: 0.255
 ```
 
-## 🔧 Model Setup
+## Setup
 
-The gobed library requires model files to be available. There are two ways to set this up:
+The model files need to be available:
 
-### Option 1: Download model files directly
 ```bash
-# Clone gobed repo and run setup
+# Option 1: Download directly
 git clone https://github.com/lee101/gobed
 cd gobed && ./setup.sh
-# This downloads the model files to gobed/model/
-```
 
-### Option 2: Link to existing model files
-```bash
-# If you already have the model files elsewhere
+# Option 2: Link existing model
 ln -s /path/to/model ./model
 ```
 
-The model directory should contain:
-- `model.onnx` - The ONNX model file
-- `tokenizer.json` - The tokenizer configuration
+## Performance
 
-## ⚡ Performance
+- **Load time**: ~250ms
+- **Encoding**: 150K+ texts/second  
+- **Memory**: ~500MB
+- **Embedding size**: 1024 dimensions
 
-- **Load time**: ~250ms model initialization
-- **Encoding speed**: ~150,000+ texts/second
-- **Memory usage**: ~500MB for model
-- **Vector dimensions**: 1024 (float32)
-
-## Example output
+## Example Output
 
 ```
 🚀 Gobed Example
-================
 Loading model... ✓ (0.25s)
 
-📝 Encoding texts:
-   ✓ Machine learning is fascinating. → [2.74, 13.40, ...]
-   ✓ Deep learning models are powerful. → [0.49, 7.40, ...]
-   ...
+📝 Similarity between related texts:
+   'Machine learning is fascinating' vs 'AI will change the world'
+   → 0.431 (moderately similar)
 
-🎯 Similarity scores:
-   'Machine learning is fascinating.'
-   'Deep learning models are powerful.'
-   → Similarity: 0.3333
+📝 Similarity between unrelated texts:  
+   'Programming in Python' vs 'Pizza tastes good'
+   → 0.089 (very different)
 
-⚡ Performance:
-   • Latency: 6µs per encoding
-   • Throughput: 166667 encodings/sec
-
-✅ Done!
+⚡ Performance: 166K encodings/sec
 ```
+
+## Files
+
+- `main.go` - Basic similarity examples with distance metrics
+- `similarity.go` - Interactive CLI calculator
+- `run_similarity.sh` - Convenience script
